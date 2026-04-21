@@ -98,7 +98,22 @@ def list_devices():
             FROM devices d
             ORDER BY d.hostname
         """).fetchall()
-        return [dict(r) for r in rows]
+        devices = [dict(r) for r in rows]
+        # Enriquecer com dados do último inventário
+        for dev in devices:
+            try:
+                inv = get_latest_inventory(dev["id"])
+                if inv:
+                    dev["ip_address"]     = inv.get("ip_address")
+                    dev["ram_gb"]         = inv.get("ram_gb")
+                    dev["cpu_name"]       = inv.get("cpu_name")
+                    pending = inv.get("pending_updates") or []
+                    dev["pending_patches"] = len(pending) if isinstance(pending, list) else 0
+                    software = inv.get("software") or []
+                    dev["software_count"] = len(software) if isinstance(software, list) else 0
+            except Exception:
+                pass
+        return devices
 
 def get_device_detail(device_id: int):
     with get_conn() as conn:
@@ -109,16 +124,23 @@ def get_device_detail(device_id: int):
         if not row:
             return None
         device = dict(row)
-        # Inclui último inventário resumido
-        inv = get_latest_inventory(device_id)
-        if inv:
-            device["os_version"]     = inv.get("os_version")
-            device["os_build"]       = inv.get("os_build")
-            device["ram_gb"]         = inv.get("ram_gb")
-            device["cpu_name"]       = inv.get("cpu_name")
-            device["ip_address"]     = inv.get("ip_address")
-            device["pending_patches"] = len(inv.get("pending_updates", []))
-            device["software_count"] = len(inv.get("software", []))
+        try:
+            inv = get_latest_inventory(device_id)
+            if inv:
+                device["os_version"]      = inv.get("os_version")
+                device["os_build"]        = inv.get("os_build")
+                device["ram_gb"]          = inv.get("ram_gb")
+                device["cpu_name"]        = inv.get("cpu_name")
+                device["cpu_cores"]       = inv.get("cpu_cores")
+                device["ip_address"]      = inv.get("ip_address")
+                device["os_arch"]         = inv.get("os_arch")
+                device["last_boot"]       = inv.get("last_boot")
+                pending = inv.get("pending_updates") or []
+                device["pending_patches"] = len(pending) if isinstance(pending, list) else 0
+                software = inv.get("software") or []
+                device["software_count"]  = len(software) if isinstance(software, list) else 0
+        except Exception as e:
+            print(f"[WARN] get_device_detail inv error: {e}")
         return device
 
 def delete_device(device_id: int):

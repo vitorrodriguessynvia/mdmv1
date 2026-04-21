@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MDM Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0a0c0f;
+    --bg2:      #111318;
+    --bg3:      #181c22;
+    --border:   #1e2430;
+    --border2:  #2a3040;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --accent:   #3b82f6;
+    --accent2:  #1d4ed8;
+    --green:    #22c55e;
+    --red:      #ef4444;
+    --amber:    #f59e0b;
+    --cyan:     #06b6d4;
+    --font:     'IBM Plex Sans', sans-serif;
+    --mono:     'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ---- LOGIN ---- */
+  #login-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+  }
+  .login-box {
+    width: 360px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 40px;
+  }
+  .login-box h1 {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .login-box p { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .field input {
+    width: 100%; padding: 10px 12px;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 6px; color: var(--text); font-family: var(--font); font-size: 14px;
+    outline: none; transition: border-color .15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .btn-primary {
+    width: 100%; padding: 11px;
+    background: var(--accent); border: none; border-radius: 6px;
+    color: #fff; font-family: var(--font); font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: background .15s;
+  }
+  .btn-primary:hover { background: var(--accent2); }
+  #login-error { color: var(--red); font-size: 13px; margin-top: 12px; display: none; }
+
+  /* ---- APP SHELL ---- */
+  #app { display: none; height: 100vh; flex-direction: column; }
+
+  /* Top bar */
+  .topbar {
+    height: 52px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; border-bottom: 1px solid var(--border);
+    background: var(--bg2); flex-shrink: 0;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 16px; }
+  .logo { font-family: var(--mono); font-size: 15px; font-weight: 500; color: var(--text); letter-spacing: -0.3px; }
+  .logo span { color: var(--accent); }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  .btn-sm {
+    padding: 6px 14px; border-radius: 5px; font-size: 13px; font-family: var(--font);
+    cursor: pointer; border: 1px solid var(--border2); background: var(--bg3); color: var(--muted);
+    transition: all .15s;
+  }
+  .btn-sm:hover { color: var(--text); border-color: var(--border2); background: var(--bg3); }
+  .btn-sm.danger:hover { color: var(--red); border-color: var(--red); }
+
+  /* Main layout */
+  .main-layout { display: flex; flex: 1; overflow: hidden; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px; background: var(--bg2); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+  }
+  .sidebar-section { padding: 16px 12px 8px; }
+  .sidebar-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding: 0 8px; margin-bottom: 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    color: var(--muted); font-size: 13px; transition: all .15s; user-select: none;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: rgba(59,130,246,.12); color: var(--accent); }
+  .nav-item svg { flex-shrink: 0; }
+  .nav-badge {
+    margin-left: auto; background: var(--accent); color: #fff;
+    font-size: 10px; padding: 1px 6px; border-radius: 10px; font-family: var(--mono);
+  }
+  .nav-badge.warn { background: var(--amber); color: #000; }
+
+  /* Device list in sidebar */
+  .device-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 6px; cursor: pointer;
+    color: var(--muted); font-size: 12px; transition: all .15s;
+    font-family: var(--mono);
+  }
+  .device-item:hover { background: var(--bg3); color: var(--text); }
+  .device-item.active { background: rgba(59,130,246,.1); color: var(--accent); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .dot-online  { background: var(--green); box-shadow: 0 0 4px var(--green); }
+  .dot-offline { background: var(--muted); }
+
+  /* Content area */
+  .content { flex: 1; overflow-y: auto; padding: 24px; }
+
+  /* ---- STATS ROW ---- */
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px 20px;
+  }
+  .stat-label { font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .stat-value { font-family: var(--mono); font-size: 28px; font-weight: 500; color: var(--text); }
+  .stat-value.green { color: var(--green); }
+  .stat-value.red   { color: var(--red); }
+  .stat-value.amber { color: var(--amber); }
+  .stat-value.blue  { color: var(--cyan); }
+
+  /* ---- TABLE ---- */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-title { font-size: 13px; font-weight: 500; color: var(--text); letter-spacing: 0.2px; }
+  .table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 10px 16px; text-align: left; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); background: var(--bg3); font-weight: 400; }
+  td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg3); cursor: pointer; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-family: var(--mono); font-weight: 500;
+  }
+  .badge-online  { background: rgba(34,197,94,.15);  color: var(--green); }
+  .badge-offline { background: rgba(100,116,139,.15); color: var(--muted); }
+  .badge-pending { background: rgba(245,158,11,.15);  color: var(--amber); }
+  .badge-done    { background: rgba(34,197,94,.15);   color: var(--green); }
+  .badge-failed  { background: rgba(239,68,68,.15);   color: var(--red); }
+  .badge-running { background: rgba(59,130,246,.15);  color: var(--accent); }
+
+  /* ---- DEVICE DETAIL ---- */
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .detail-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; }
+  .detail-card h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 12px; }
+  .detail-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-row .key { color: var(--muted); }
+  .detail-row .val { font-family: var(--mono); font-size: 12px; color: var(--text); text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Command panel */
+  .cmd-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+  .cmd-panel h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 14px; }
+  .cmd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 8px; margin-bottom: 14px; }
+  .cmd-btn {
+    padding: 10px 8px; background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 6px; color: var(--muted); font-family: var(--font); font-size: 12px;
+    cursor: pointer; transition: all .15s; text-align: center;
+  }
+  .cmd-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(59,130,246,.08); }
+  .cmd-btn.danger:hover { border-color: var(--red); color: var(--red); background: rgba(239,68,68,.08); }
+  .script-area {
+    width: 100%; padding: 10px 12px;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 6px; color: var(--cyan); font-family: var(--mono); font-size: 12px;
+    resize: vertical; min-height: 80px; outline: none; display: none;
+    transition: border-color .15s;
+  }
+  .script-area:focus { border-color: var(--accent); }
+  .app-input {
+    width: 100%; padding: 9px 12px; margin-top: 8px;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 12px;
+    outline: none; display: none;
+  }
+  .app-input:focus { border-color: var(--accent); }
+  .btn-send {
+    margin-top: 10px; padding: 9px 20px;
+    background: var(--accent); border: none; border-radius: 6px;
+    color: #fff; font-family: var(--font); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: background .15s; display: none;
+  }
+  .btn-send:hover { background: var(--accent2); }
+
+  /* Patches list */
+  .patch-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+  }
+  .patch-item:last-child { border-bottom: none; }
+  .patch-title { color: var(--text); font-family: var(--mono); }
+  .patch-severity { padding: 1px 7px; border-radius: 3px; font-size: 10px; font-weight: 500; }
+  .sev-critical { background: rgba(239,68,68,.2); color: var(--red); }
+  .sev-important { background: rgba(245,158,11,.2); color: var(--amber); }
+  .sev-moderate { background: rgba(100,116,139,.2); color: var(--muted); }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: 6px;
+    padding: 12px 18px; font-size: 13px; color: var(--text);
+    opacity: 0; transform: translateY(8px); transition: all .2s;
+    pointer-events: none; z-index: 1000;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.success { border-color: var(--green); color: var(--green); }
+  #toast.error   { border-color: var(--red);   color: var(--red); }
+
+  /* Loading */
+  .loading { text-align: center; padding: 48px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .empty   { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+
+  /* Software list */
+  .sw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-height: 280px; overflow-y: auto; }
+  .sw-item { display: flex; justify-content: space-between; padding: 5px 8px; background: var(--bg3); border-radius: 4px; font-size: 11px; }
+  .sw-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%; }
+  .sw-ver  { color: var(--muted); font-family: var(--mono); }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>MDM<span>.</span>Console</h1>
+    <p>Painel de gerenciamento de dispositivos</p>
+    <div class="field">
+      <label>Servidor</label>
+      <input type="text" id="login-server" placeholder="https://seu-servidor.com" value="">
+    </div>
+    <div class="field">
+      <label>Usuário</label>
+      <input type="text" id="login-user" placeholder="admin" value="admin">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="password" id="login-pass" placeholder="••••••••">
+    </div>
+    <button class="btn-primary" onclick="doLogin()">Entrar</button>
+    <div id="login-error">Credenciais inválidas ou servidor inacessível.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="logo">MDM<span>.</span>Console</span>
+      <span style="color:var(--muted);font-size:12px;font-family:var(--mono)" id="server-label"></span>
+    </div>
+    <div class="topbar-right">
+      <span style="color:var(--muted);font-size:12px" id="last-refresh"></span>
+      <button class="btn-sm" onclick="loadAll()">↻ Atualizar</button>
+      <button class="btn-sm danger" onclick="logout()">Sair</button>
+    </div>
+  </div>
+
+  <div class="main-layout">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Navegação</div>
+        <div class="nav-item active" onclick="showPage('overview')" id="nav-overview">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Visão geral
+        </div>
+        <div class="nav-item" onclick="showPage('devices')" id="nav-devices">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          Dispositivos
+          <span class="nav-badge" id="badge-devices">0</span>
+        </div>
+        <div class="nav-item" onclick="showPage('patches')" id="nav-patches">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Patches
+          <span class="nav-badge warn" id="badge-patches">0</span>
+        </div>
+        <div class="nav-item" onclick="showPage('commands')" id="nav-commands">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          Comandos
+        </div>
+      </div>
+      <div class="sidebar-section" style="flex:1">
+        <div class="sidebar-label">Dispositivos</div>
+        <div id="sidebar-devices"></div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content" id="content">
+      <div class="loading">Carregando...</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ============================================================
+//  STATE
+// ============================================================
+let SERVER = '', USER = '', PASS = '';
+let devices = [], stats = {}, selectedDevice = null;
+let currentPage = 'overview';
+let selectedCmd = null;
+
+// ============================================================
+//  AUTH
+// ============================================================
+async function doLogin() {
+  SERVER = document.getElementById('login-server').value.replace(/\/$/, '');
+  USER   = document.getElementById('login-user').value;
+  PASS   = document.getElementById('login-pass').value;
+  if (!SERVER || !USER || !PASS) { showError('Preencha todos os campos.'); return; }
+  try {
+    const r = await apiFetch('/api/admin/stats');
+    if (!r.ok) throw new Error();
+    localStorage.setItem('mdm_server', SERVER);
+    localStorage.setItem('mdm_user',   USER);
+    localStorage.setItem('mdm_pass',   PASS);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('server-label').textContent = SERVER.replace('https://','').replace('http://','');
+    loadAll();
+  } catch {
+    showError('Credenciais inválidas ou servidor inacessível.');
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function logout() {
+  localStorage.clear(); location.reload();
+}
+
+function authHeader() {
+  return 'Basic ' + btoa(USER + ':' + PASS);
+}
+
+async function apiFetch(path, opts = {}) {
+  return fetch(SERVER + path, {
+    ...opts,
+    headers: { 'Authorization': authHeader(), 'Content-Type': 'application/json', ...(opts.headers || {}) }
+  });
+}
+
+// ============================================================
+//  DATA LOADING
+// ============================================================
+async function loadAll() {
+  try {
+    const [sRes, dRes] = await Promise.all([
+      apiFetch('/api/admin/stats'),
+      apiFetch('/api/admin/devices')
+    ]);
+    stats   = await sRes.json();
+    devices = await dRes.json();
+    updateSidebar();
+    updateBadges();
+    document.getElementById('last-refresh').textContent =
+      'Atualizado ' + new Date().toLocaleTimeString('pt-BR');
+    renderPage();
+  } catch(e) {
+    document.getElementById('content').innerHTML =
+      '<div class="empty">Erro ao conectar ao servidor.<br><small style="color:var(--muted)">' + e.message + '</small></div>';
+  }
+}
+
+function updateSidebar() {
+  const el = document.getElementById('sidebar-devices');
+  if (!devices.length) { el.innerHTML = '<div style="padding:8px 10px;color:var(--muted);font-size:12px">Nenhum dispositivo</div>'; return; }
+  el.innerHTML = devices.map(d => `
+    <div class="device-item ${selectedDevice?.id === d.id ? 'active' : ''}"
+         onclick="openDevice(${d.id})">
+      <span class="status-dot dot-${d.status}"></span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.hostname}</span>
+    </div>`).join('');
+}
+
+function updateBadges() {
+  document.getElementById('badge-devices').textContent = stats.devices_total || 0;
+  document.getElementById('badge-patches').textContent = stats.patches_pending || 0;
+}
+
+// ============================================================
+//  NAVIGATION
+// ============================================================
+function showPage(page) {
+  currentPage = page;
+  ['overview','devices','patches','commands'].forEach(p => {
+    document.getElementById('nav-'+p).classList.toggle('active', p === page);
+  });
+  selectedDevice = null;
+  renderPage();
+}
+
+function renderPage() {
+  if (selectedDevice) { renderDeviceDetail(); return; }
+  switch(currentPage) {
+    case 'overview':  renderOverview();  break;
+    case 'devices':   renderDevices();   break;
+    case 'patches':   renderPatches();   break;
+    case 'commands':  renderCommands();  break;
+  }
+}
+
+// ============================================================
+//  OVERVIEW
+// ============================================================
+function renderOverview() {
+  document.getElementById('content').innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Total</div>
+        <div class="stat-value blue">${stats.devices_total || 0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Online</div>
+        <div class="stat-value green">${stats.devices_online || 0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Offline</div>
+        <div class="stat-value ${stats.devices_offline > 0 ? 'red' : ''}">${stats.devices_offline || 0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Patches pendentes</div>
+        <div class="stat-value ${stats.patches_pending > 0 ? 'amber' : ''}">${stats.patches_pending || 0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Comandos falhados</div>
+        <div class="stat-value ${stats.commands_failed > 0 ? 'red' : ''}">${stats.commands_failed || 0}</div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <span class="section-title">Dispositivos</span>
+      <button class="btn-sm" onclick="sendToAll()">Enviar para todos</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Status</th><th>Hostname</th><th>Sistema</th><th>IP</th>
+          <th>Patches</th><th>Último checkin</th>
+        </tr></thead>
+        <tbody>
+          ${devices.length ? devices.map(d => `
+            <tr onclick="openDevice(${d.id})">
+              <td><span class="badge badge-${d.status}">${d.status}</span></td>
+              <td class="mono">${d.hostname}</td>
+              <td style="color:var(--muted)">${d.os || '—'}</td>
+              <td class="mono">${d.ip_address || '—'}</td>
+              <td>${d.pending_patches > 0 ? `<span class="badge badge-pending">${d.pending_patches}</span>` : '<span style="color:var(--muted)">0</span>'}</td>
+              <td style="color:var(--muted)">${formatDate(d.last_seen)}</td>
+            </tr>`).join('') : '<tr><td colspan="6" class="empty">Nenhum dispositivo registrado ainda.</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ============================================================
+//  DEVICES LIST
+// ============================================================
+function renderDevices() {
+  document.getElementById('content').innerHTML = `
+    <div class="section-header">
+      <span class="section-title">Todos os dispositivos (${devices.length})</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Status</th><th>Hostname</th><th>OS</th><th>RAM</th><th>CPU</th>
+          <th>Software</th><th>Patches</th><th>Registrado</th>
+        </tr></thead>
+        <tbody>
+          ${devices.length ? devices.map(d => `
+            <tr onclick="openDevice(${d.id})">
+              <td><span class="badge badge-${d.status}">${d.status}</span></td>
+              <td class="mono">${d.hostname}</td>
+              <td style="color:var(--muted);font-size:12px">${d.os || '—'}</td>
+              <td class="mono">${d.ram_gb ? d.ram_gb+'GB' : '—'}</td>
+              <td style="color:var(--muted);font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.cpu_name || '—'}</td>
+              <td style="color:var(--muted)">${d.software_count ?? '—'}</td>
+              <td>${d.pending_patches > 0 ? `<span class="badge badge-pending">${d.pending_patches} pendentes</span>` : '0'}</td>
+              <td style="color:var(--muted)">${formatDate(d.enrolled_at)}</td>
+            </tr>`).join('') : '<tr><td colspan="8" class="empty">Nenhum dispositivo.</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ============================================================
+//  PATCHES
+// ============================================================
+async function renderPatches() {
+  document.getElementById('content').innerHTML = '<div class="loading">Carregando patches...</div>';
+  const allPatches = [];
+  for (const d of devices) {
+    try {
+      const r = await apiFetch(`/api/admin/devices/${d.id}/inventory`);
+      const inv = await r.json();
+      (inv.pending_updates || []).forEach(p => allPatches.push({ ...p, hostname: d.hostname, device_id: d.id }));
+    } catch {}
+  }
+
+  document.getElementById('content').innerHTML = `
+    <div class="section-header">
+      <span class="section-title">Atualizações pendentes (${allPatches.length})</span>
+      <button class="btn-sm" onclick="applyAllPatches()" style="border-color:var(--amber);color:var(--amber)">
+        Aplicar em todos os PCs
+      </button>
+    </div>
+    ${allPatches.length ? `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Hostname</th><th>Atualização</th><th>KB</th><th>Severidade</th><th>Tamanho</th><th></th></tr></thead>
+        <tbody>
+          ${allPatches.map(p => `
+            <tr>
+              <td class="mono">${p.hostname}</td>
+              <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${p.title}</td>
+              <td class="mono" style="color:var(--cyan)">${p.kb || '—'}</td>
+              <td>${severityBadge(p.severity)}</td>
+              <td class="mono" style="color:var(--muted)">${p.size_mb ? p.size_mb+'MB' : '—'}</td>
+              <td><button class="btn-sm" onclick="applyPatch(${p.device_id})" style="color:var(--accent)">Aplicar</button></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : '<div class="empty" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:48px">Nenhuma atualização pendente — todos os dispositivos estão atualizados.</div>'}`;
+}
+
+function severityBadge(s) {
+  if (!s) return '<span style="color:var(--muted)">—</span>';
+  const cls = s === 'Critical' ? 'sev-critical' : s === 'Important' ? 'sev-important' : 'sev-moderate';
+  return `<span class="patch-severity ${cls}">${s}</span>`;
+}
+
+async function applyPatch(deviceId) {
+  await sendCommand(deviceId, 'apply_patches', '');
+}
+async function applyAllPatches() {
+  for (const d of devices) await sendCommand(d.id, 'apply_patches', '');
+  toast('Comando enviado para todos os dispositivos.', 'success');
+}
+
+// ============================================================
+//  COMMANDS PAGE
+// ============================================================
+async function renderCommands() {
+  document.getElementById('content').innerHTML = '<div class="loading">Carregando comandos...</div>';
+  const allCmds = [];
+  for (const d of devices) {
+    try {
+      const r = await apiFetch(`/api/admin/devices/${d.id}/commands`);
+      const cmds = await r.json();
+      cmds.forEach(c => allCmds.push({ ...c, hostname: d.hostname }));
+    } catch {}
+  }
+  allCmds.sort((a,b) => b.created_at?.localeCompare(a.created_at));
+
+  document.getElementById('content').innerHTML = `
+    <div class="section-header">
+      <span class="section-title">Histórico de comandos (${allCmds.length})</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Status</th><th>Dispositivo</th><th>Tipo</th><th>Payload</th><th>Output</th><th>Enviado em</th><th>Executado em</th></tr></thead>
+        <tbody>
+          ${allCmds.length ? allCmds.map(c => `
+            <tr>
+              <td><span class="badge badge-${c.status}">${c.status}</span></td>
+              <td class="mono">${c.hostname}</td>
+              <td class="mono" style="color:var(--cyan)">${c.type}</td>
+              <td class="mono" style="color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.payload || '—'}</td>
+              <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:${c.error ? 'var(--red)':'var(--muted)'}">${c.error || c.output || '—'}</td>
+              <td style="color:var(--muted)">${formatDate(c.created_at)}</td>
+              <td style="color:var(--muted)">${formatDate(c.executed_at)}</td>
+            </tr>`).join('') : '<tr><td colspan="7" class="empty">Nenhum comando registrado.</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ============================================================
+//  DEVICE DETAIL
+// ============================================================
+async function openDevice(id) {
+  selectedDevice = devices.find(d => d.id === id);
+  updateSidebar();
+  document.getElementById('content').innerHTML = '<div class="loading">Carregando dispositivo...</div>';
+  try {
+    const [detailRes, invRes, cmdRes] = await Promise.all([
+      apiFetch(`/api/admin/devices/${id}`),
+      apiFetch(`/api/admin/devices/${id}/inventory`),
+      apiFetch(`/api/admin/devices/${id}/commands`)
+    ]);
+    const detail = await detailRes.json();
+    const inv    = invRes.ok ? await invRes.json() : null;
+    const cmds   = cmdRes.ok ? await cmdRes.json() : [];
+    renderDeviceDetail(detail, inv, cmds);
+  } catch(e) {
+    document.getElementById('content').innerHTML = '<div class="empty">Erro ao carregar dispositivo.</div>';
+  }
+}
+
+function renderDeviceDetail(detail, inv, cmds) {
+  if (!detail && selectedDevice) detail = selectedDevice;
+  const d = detail || selectedDevice;
+  if (!d) return;
+
+  document.getElementById('content').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <button class="btn-sm" onclick="selectedDevice=null;renderPage()">← Voltar</button>
+      <h2 style="font-family:var(--mono);font-size:16px;font-weight:500">${d.hostname}</h2>
+      <span class="badge badge-${d.status}">${d.status}</span>
+      <span style="margin-left:auto;color:var(--muted);font-size:12px">Último checkin: ${formatDate(d.last_seen)}</span>
+      <button class="btn-sm danger" onclick="removeDevice(${d.id})">Remover</button>
+    </div>
+
+    <div class="detail-grid">
+      <div class="detail-card">
+        <h3>Sistema</h3>
+        ${row('OS', inv?.os_name || d.os)}
+        ${row('Versão', inv?.os_version)}
+        ${row('Build', inv?.os_build)}
+        ${row('Arquitetura', inv?.os_arch)}
+        ${row('Último boot', formatDate(inv?.last_boot))}
+      </div>
+      <div class="detail-card">
+        <h3>Hardware</h3>
+        ${row('CPU', inv?.cpu_name)}
+        ${row('Núcleos', inv?.cpu_cores)}
+        ${row('RAM', inv?.ram_gb ? inv.ram_gb + ' GB' : null)}
+        ${row('IP', inv?.ip_address || d.ip_address)}
+        ${(()=>{ const disks=inv?.disks; if(!disks) return ''; const arr=Array.isArray(disks)?disks:[disks]; return arr.map(dk=>row('Disco '+(dk.DeviceID||''), (dk.SizeGB||'?')+'GB / '+(dk.FreeGB||'?')+'GB livre')).join(''); })()}
+      </div>
+    </div>
+
+    <!-- Comandos -->
+    <div class="cmd-panel">
+      <h3>Enviar comando</h3>
+      <div class="cmd-grid">
+        <div class="cmd-btn" onclick="selectCmd('apply_patches',${d.id})">Aplicar patches</div>
+        <div class="cmd-btn" onclick="selectCmd('get_inventory',${d.id})">Forçar inventário</div>
+        <div class="cmd-btn" onclick="selectCmd('install_app',${d.id})">Instalar app</div>
+        <div class="cmd-btn" onclick="selectCmd('uninstall_app',${d.id})">Remover app</div>
+        <div class="cmd-btn" onclick="selectCmd('run_script',${d.id})">Executar script</div>
+        <div class="cmd-btn danger" onclick="selectCmd('reboot',${d.id})">Reiniciar PC</div>
+      </div>
+      <textarea id="script-input" class="script-area" placeholder="# Cole seu script PowerShell aqui&#10;Get-Process | Select-Object -First 5"></textarea>
+      <input id="app-input" class="app-input" placeholder="Winget ID — ex: Google.Chrome">
+      <button class="btn-send" id="btn-send" onclick="executeSelected(${d.id})">Enviar comando</button>
+    </div>
+
+    <!-- Patches pendentes -->
+    ${inv?.pending_updates?.length ? `
+    <div class="detail-card" style="margin-bottom:16px">
+      <h3>Atualizações pendentes (${inv.pending_updates.length})</h3>
+      ${inv.pending_updates.map(p => `
+        <div class="patch-item">
+          <span class="patch-title">${p.kb || ''} ${p.title?.substring(0,60)}${p.title?.length > 60 ? '…' : ''}</span>
+          ${severityBadge(p.severity)}
+        </div>`).join('')}
+    </div>` : ''}
+
+    <!-- Software -->
+    ${inv?.software?.length ? `
+    <div class="detail-card" style="margin-bottom:16px">
+      <h3>Software instalado (${inv.software.length})</h3>
+      <div class="sw-grid">
+        ${inv.software.map(s => `
+          <div class="sw-item">
+            <span class="sw-name">${s.name}</span>
+            <span class="sw-ver">${s.version || ''}</span>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <!-- Histórico de comandos -->
+    <div class="section-header"><span class="section-title">Histórico de comandos</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Status</th><th>Tipo</th><th>Payload</th><th>Output / Erro</th><th>Enviado</th></tr></thead>
+        <tbody>
+          ${cmds.length ? cmds.map(c => `
+            <tr>
+              <td><span class="badge badge-${c.status}">${c.status}</span></td>
+              <td class="mono" style="color:var(--cyan)">${c.type}</td>
+              <td class="mono" style="color:var(--muted)">${c.payload || '—'}</td>
+              <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:${c.error?'var(--red)':'var(--muted)'}">${c.error || c.output || '—'}</td>
+              <td style="color:var(--muted)">${formatDate(c.created_at)}</td>
+            </tr>`).join('') : '<tr><td colspan="5" class="empty">Nenhum comando enviado ainda.</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function row(label, val) {
+  if (!val) return '';
+  return `<div class="detail-row"><span class="key">${label}</span><span class="val" title="${val}">${val}</span></div>`;
+}
+
+// ============================================================
+//  COMMANDS
+// ============================================================
+function selectCmd(type, deviceId) {
+  selectedCmd = type;
+  const script = document.getElementById('script-input');
+  const appIn  = document.getElementById('app-input');
+  const btn    = document.getElementById('btn-send');
+  if (!script) return;
+
+  script.style.display = 'none';
+  appIn.style.display  = 'none';
+  btn.style.display    = 'block';
+
+  if (type === 'run_script') { script.style.display = 'block'; }
+  if (type === 'install_app' || type === 'uninstall_app') { appIn.style.display = 'block'; }
+
+  const labels = {
+    apply_patches: 'Aplicar patches',
+    get_inventory: 'Forçar inventário',
+    install_app:   'Instalar app',
+    uninstall_app: 'Remover app',
+    run_script:    'Executar script',
+    reboot:        'Reiniciar PC'
+  };
+  btn.textContent = 'Enviar: ' + labels[type];
+}
+
+async function executeSelected(deviceId) {
+  if (!selectedCmd) return;
+  let payload = '';
+  if (selectedCmd === 'run_script') payload = document.getElementById('script-input').value;
+  if (selectedCmd === 'install_app' || selectedCmd === 'uninstall_app') payload = document.getElementById('app-input').value;
+  await sendCommand(deviceId, selectedCmd, payload);
+  selectedCmd = null;
+  document.getElementById('btn-send').style.display = 'none';
+  document.getElementById('script-input').style.display = 'none';
+  document.getElementById('app-input').style.display = 'none';
+  openDevice(deviceId);
+}
+
+async function sendCommand(deviceId, type, payload) {
+  try {
+    const r = await apiFetch(`/api/admin/devices/${deviceId}/commands`, {
+      method: 'POST',
+      body: JSON.stringify({ type, payload })
+    });
+    if (r.ok) toast('Comando "' + type + '" enfileirado.', 'success');
+    else toast('Erro ao enviar comando.', 'error');
+  } catch { toast('Erro de conexão.', 'error'); }
+}
+
+async function sendToAll() {
+  const type = prompt('Tipo de comando para todos os dispositivos:\napply_patches | get_inventory | reboot');
+  if (!type) return;
+  for (const d of devices) await sendCommand(d.id, type, '');
+  toast('Comando enviado para ' + devices.length + ' dispositivos.', 'success');
+}
+
+async function removeDevice(id) {
+  if (!confirm('Remover este dispositivo do MDM?')) return;
+  await apiFetch(`/api/admin/devices/${id}`, { method: 'DELETE' });
+  selectedDevice = null;
+  await loadAll();
+  showPage('devices');
+}
+
+// ============================================================
+//  UTILS
+// ============================================================
+function formatDate(str) {
+  if (!str) return '—';
+  try {
+    return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+  } catch { return str; }
+}
+
+let toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 3000);
+}
+
+// ============================================================
+//  AUTO LOGIN (se já tiver credenciais salvas)
+// ============================================================
+window.addEventListener('load', () => {
+  const s = localStorage.getItem('mdm_server');
+  const u = localStorage.getItem('mdm_user');
+  const p = localStorage.getItem('mdm_pass');
+  if (s && u && p) {
+    document.getElementById('login-server').value = s;
+    document.getElementById('login-user').value = u;
+    document.getElementById('login-pass').value = p;
+    SERVER = s; USER = u; PASS = p;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('server-label').textContent = s.replace('https://','').replace('http://','');
+    loadAll();
+  }
+  document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+});
+
+// Auto-refresh a cada 60 segundos
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>
